@@ -1,4 +1,4 @@
-package entity
+package model
 
 type Movie struct {
 	ID       int    `json:"imdbID"`
