@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/awize/movies-searcher/config"
@@ -12,30 +13,51 @@ import (
 	"github.com/awize/movies-searcher/service"
 	usecase "github.com/awize/movies-searcher/usecase/movie"
 	"github.com/gin-gonic/gin"
+	"github.com/go-resty/resty/v2"
+	"github.com/spf13/viper"
 )
 
 func main() {
-
-	fileR, err := os.Open("/Users/alexis.jimenez/Wizening/movies-searcher/movies.csv")
+	public := viper.New()
+	public.SetConfigFile(config.ConfigFile)
+	if err := public.ReadInConfig(); err != nil {
+		fmt.Println(err)
+	}
+	config := &config.Config{}
+	fmt.Println(public.AllKeys())
+	err := public.Unmarshal(config)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fileW, err := os.OpenFile("/Users/alexis.jimenez/Wizening/movies-searcher/movies.csv", os.O_RDWR, 0644)
+	fmt.Println("config:", config)
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fileNameAbs := filepath.Join(workspaceDir, config.MoviesFileName)
+	fileR, err := os.Open(fileNameAbs)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fileW, err := os.OpenFile(fileNameAbs, os.O_RDWR, 0644)
 	if err != nil {
 		fmt.Println(err)
 	}
 	defer fileR.Close()
 	defer fileW.Close()
-	movieService := service.NewMoviesService(fileR, fileW)
+	client := resty.New()
+
+	movieService := service.NewMoviesService(fileR, fileW, client, config)
 	movieUseCase := usecase.NewMovieUsecase(movieService)
 	movieController := controller.NewMovieController(movieUseCase)
 
 	r := gin.Default()
 	router.MakeMovieHandlers(r, movieController)
+	// TODO: Change to api stats
 	r.GET("/healthcheck", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Working"})
 	})
-	r.Run(":" + strconv.Itoa(config.API_PORT))
+	r.Run(":" + strconv.Itoa(config.Port))
 }
 
 // Viper -- set config file - file nameyaml

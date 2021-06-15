@@ -8,18 +8,24 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/awize/movies-searcher/config"
 	"github.com/awize/movies-searcher/model"
+	"github.com/go-resty/resty/v2"
 )
 
 type MovieService struct {
-	fileR *os.File
-	fileW *os.File
+	fileR  *os.File
+	fileW  *os.File
+	client *resty.Client
+	config *config.Config
 }
 
-func NewMoviesService(fileR *os.File, fileW *os.File) *MovieService {
+func NewMoviesService(fileR *os.File, fileW *os.File, client *resty.Client, config *config.Config) *MovieService {
 	return &MovieService{
 		fileR,
 		fileW,
+		client,
+		config,
 	}
 }
 
@@ -42,9 +48,7 @@ func (r *MovieService) readRecords() []model.Movie {
 		movie := model.Movie{}
 		movie.ID, _ = strconv.Atoi(record[1][2:])
 		movie.Title = record[2]
-		movie.Year, _ = strconv.Atoi(record[0])
 		movie.Budget, _ = strconv.Atoi(record[6])
-		movie.Domgross, _ = strconv.Atoi(record[7])
 
 		records = append(records, movie)
 	}
@@ -66,4 +70,32 @@ func (r *MovieService) Get(id int) (*model.Movie, error) {
 func (r *MovieService) GetAll() ([]model.Movie, error) {
 	movies := r.readRecords()
 	return movies, nil
+}
+
+func (r *MovieService) GetExternalMovie(id int) ([]model.Movie, error) {
+	resp, err := r.client.R().
+		SetQueryParams(map[string]string{
+			"api_key":  r.config.MoviesAPI.ApiKey,
+			"language": r.config.MoviesAPI.Defaults["lang"],
+		}).
+		Get(fmt.Sprint(r.config.MoviesAPI.BaseUrl, "/movie", id))
+
+	fmt.Println(resp, err)
+
+	// resp.budget
+	// resp.genres
+	// resp.id
+	// resp.original_language
+	// resp.original_title
+	// resp.overview
+	// resp.poster_path
+	// resp.release_date
+	// resp.revenue
+	// resp.runtime
+	// resp.spoken_languages
+	// resp.status
+	// resp.title
+	// resp.vote_average
+	// resp.vote_count
+	return nil, nil
 }
