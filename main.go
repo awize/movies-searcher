@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"net/http"
 	"os"
@@ -39,15 +40,16 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fileW, err := os.OpenFile(fileNameAbs, os.O_RDWR, 0644)
+	fileW, err := os.OpenFile(fileNameAbs, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
 		fmt.Println(err)
 	}
 	defer fileR.Close()
 	defer fileW.Close()
 	client := resty.New()
-
-	movieService := service.NewMoviesService(fileR, fileW, client, config)
+	csvr := csv.NewReader(fileR)
+	csvw := csv.NewWriter(fileW)
+	movieService := service.NewMoviesService(csvr, csvw, client, config)
 	movieUseCase := usecase.NewMovieUsecase(movieService)
 	movieController := controller.NewMovieController(movieUseCase)
 
@@ -57,7 +59,7 @@ func main() {
 	r.GET("/healthcheck", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Working"})
 	})
-	r.Run(":" + strconv.Itoa(config.Port))
+	r.Run("localhost:" + strconv.Itoa(config.Port))
 }
 
 // Viper -- set config file - file nameyaml

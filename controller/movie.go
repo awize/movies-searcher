@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -11,6 +12,7 @@ import (
 type MovieUseCase interface {
 	GetMovie(id int) (*model.Movie, error)
 	GetMovies() ([]model.Movie, error)
+	SearchMovies(query string, page int) ([]byte, error)
 }
 
 type MovieController struct {
@@ -47,5 +49,25 @@ func (mc *MovieController) GetMovie() gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, movie)
+	}
+}
+
+func (mc *MovieController) SearchMovie() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		query := c.DefaultQuery("query", "")
+		page := c.DefaultQuery("page", "0")
+
+		pageNumber, err := strconv.Atoi(page)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "page should be a number"})
+		}
+		result, err := mc.mu.SearchMovies(query, pageNumber)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "something unexpected happened"})
+			return
+		}
+		fmt.Println(result)
+
+		c.Data(http.StatusOK, "application/json", result)
 	}
 }

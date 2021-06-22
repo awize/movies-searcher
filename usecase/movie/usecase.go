@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/awize/movies-searcher/model"
 )
@@ -10,6 +9,7 @@ import (
 type MovieService interface {
 	Get(id int) (*model.Movie, error)
 	GetAll() ([]model.Movie, error)
+	SearchMovies(query string, page int) ([]byte, error)
 }
 
 type MovieUsecase struct {
@@ -24,7 +24,7 @@ func NewMovieUsecase(service MovieService) *MovieUsecase {
 
 func (u *MovieUsecase) GetMovie(id int) (*model.Movie, error) {
 	movie, err := u.service.Get(id)
-	fmt.Println(movie)
+
 	if err != nil {
 		return nil, err
 	}
@@ -42,4 +42,9 @@ func (u *MovieUsecase) GetMovies() ([]model.Movie, error) {
 		return nil, err
 	}
 	return movies, nil
+}
+
+func (u *MovieUsecase) SearchMovies(query string, page int) ([]byte, error) {
+	result, err := u.service.SearchMovies(query, page)
+	return result, err
 }

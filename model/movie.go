@@ -1,38 +1,48 @@
 package model
 
-type Movie struct {
-	ID               int      `json:"ID"`
-	Budget           int      `json:"budget"`
-	Genres           []string `json:"genres"`
-	OriginalLanguage string   `json:"original_language"`
-	OriginalTitle    string   `json:"original_title"`
-	Overview         string   `json:"overview"`
-	PosterPath       string   `json:"poster_path"`
-	ReleaseDate      string   `json:"release_date"`
-	Revenue          int      `json:"revenue"`
-	SpokenLanguages  []string `json:"spoken_languages"`
-	Status           string   `json:"status"`
-	Title            string   `json:"title"`
-	VoteAverage      float64  `json:"vote_average"`
-	VoteCount        int      `json:"vote_count"`
+type Genre struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
-type MovieDBResponse struct {
-	ID               int                 `json:"ID"`
-	Budget           int                 `json:"budget"`
-	Genres           []map[string]string `json:"genres"`
-	OriginalLanguage string              `json:"original_language"`
-	OriginalTitle    string              `json:"original_title"`
-	Overview         string              `json:"overview"`
-	PosterPath       string              `json:"poster_path"`
-	ReleaseDate      string              `json:"release_date"`
-	Revenue          int                 `json:"revenue"`
-	SpokenLanguages  []map[string]string `json:"spoken_languages"`
-	Status           string              `json:"status"`
-	Title            string              `json:"title"`
-	VoteAverage      float64             `json:"vote_average"`
-	VoteCount        int                 `json:"vote_count"`
+type Language struct {
+	EnglishName string `json:"english_name"`
+	Name        string `json:"name"`
 }
+
+type Movie struct {
+	ID               int        `json:"id"`
+	Budget           int        `json:"budget"`
+	Genres           []Genre    `json:"genres"`
+	OriginalLanguage string     `json:"original_language"`
+	OriginalTitle    string     `json:"original_title"`
+	Overview         string     `json:"overview"`
+	PosterPath       string     `json:"poster_path"`
+	ReleaseDate      string     `json:"release_date"`
+	Revenue          int        `json:"revenue"`
+	SpokenLanguages  []Language `json:"spoken_languages"`
+	Status           string     `json:"status"`
+	Title            string     `json:"title"`
+	VoteAverage      float64    `json:"vote_average"`
+	VoteCount        int        `json:"vote_count"`
+}
+
+// type MovieDBResponse struct {
+// 	ID               int                 `json:"ID"`
+// 	Budget           int                 `json:"budget"`
+// 	Genres           []map[string]string `json:"genres"`
+// 	OriginalLanguage string              `json:"original_language"`
+// 	OriginalTitle    string              `json:"original_title"`
+// 	Overview         string              `json:"overview"`
+// 	PosterPath       string              `json:"poster_path"`
+// 	ReleaseDate      string              `json:"release_date"`
+// 	Revenue          int                 `json:"revenue"`
+// 	SpokenLanguages  []map[string]string `json:"spoken_languages"`
+// 	Status           string              `json:"status"`
+// 	Title            string              `json:"title"`
+// 	VoteAverage      float64             `json:"vote_average"`
+// 	VoteCount        int                 `json:"vote_count"`
+// }
 
 // genres 28:action-
 
