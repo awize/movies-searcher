@@ -55,7 +55,7 @@ func (mc *MovieController) GetMovie() gin.HandlerFunc {
 func (mc *MovieController) SearchMovie() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		query := c.DefaultQuery("query", "")
-		page := c.DefaultQuery("page", "0")
+		page := c.DefaultQuery("page", "1")
 
 		pageNumber, err := strconv.Atoi(page)
 		if err != nil {

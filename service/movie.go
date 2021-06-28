@@ -76,8 +76,9 @@ func (r *MovieService) SearchMovies(query string, page int) ([]byte, error) {
 			"page":          pageString,
 			"query":         query,
 		}).
-		Get(fmt.Sprint(r.config.MoviesAPI.BaseUrl, "search/movie"))
+		Get(fmt.Sprint(r.config.MoviesAPI.BaseUrl, "/search/movie"))
 
+	fmt.Println(fmt.Sprint(r.config.MoviesAPI.BaseUrl, "/search/movie"))
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +91,7 @@ func (r *MovieService) SearchMovies(query string, page int) ([]byte, error) {
 	fmt.Println("  Received At:", resp.ReceivedAt())
 	fmt.Println("  Body       :\n", resp)
 	fmt.Println()
+
 	return resp.Body(), nil
 }
 
@@ -151,6 +153,7 @@ func (r *MovieService) getMovieValues(movie model.Movie) []string {
 				}
 			}
 			value = strings.Join(formattedSpokenLanguages, SPOKEN_LANGUAGES_SEPARATOR)
+
 		default:
 			value = fmt.Sprintf("%v", fieldInterface)
 		}
