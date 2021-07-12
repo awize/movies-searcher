@@ -49,7 +49,7 @@ func main() {
 	client := resty.New()
 	csvr := csv.NewReader(fileR)
 	csvw := csv.NewWriter(fileW)
-	movieService := service.NewMoviesService(csvr, csvw, client, config)
+	movieService := service.NewMoviesService(fileR, csvr, csvw, client, config)
 	movieUseCase := usecase.NewMovieUsecase(movieService)
 	movieController := controller.NewMovieController(movieUseCase)
 
