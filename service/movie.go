@@ -3,11 +3,14 @@ package service
 import (
 	"encoding/csv"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/awize/movies-searcher/config"
 	"github.com/awize/movies-searcher/model"
@@ -23,15 +26,19 @@ const GENRES_ATTRS_SEPARATOR = ":"
 const SPOKEN_LANGUAGES_SEPARATOR = GENRES_SEPARATOR
 const SPOKEN_LANGUAGES_ATTRS_SEPARATOR = GENRES_ATTRS_SEPARATOR
 
+type filterFn func(model.Movie, map[string][]string) bool
+
 type MovieService struct {
+	file   *os.File
 	csvr   *csv.Reader
 	csvw   *csv.Writer
 	client *resty.Client
 	config *config.Config
 }
 
-func NewMoviesService(fileR *csv.Reader, fileW *csv.Writer, client *resty.Client, config *config.Config) *MovieService {
+func NewMoviesService(file *os.File, fileR *csv.Reader, fileW *csv.Writer, client *resty.Client, config *config.Config) *MovieService {
 	return &MovieService{
+		file,
 		fileR,
 		fileW,
 		client,
@@ -40,6 +47,7 @@ func NewMoviesService(fileR *csv.Reader, fileW *csv.Writer, client *resty.Client
 }
 
 func (r *MovieService) Get(id int) (*model.Movie, error) {
+
 	movies := r.readMovies()
 
 	for i := 0; i < len(movies); i++ {
@@ -48,12 +56,11 @@ func (r *MovieService) Get(id int) (*model.Movie, error) {
 		}
 	}
 
-	fmt.Println("Lets go to external API")
 	movie, err := r.getExternalMovie(id)
 	if err != nil {
-		return nil, errors.New("something in external movie happened")
+		return &model.Movie{}, fmt.Errorf("get %v: %w", id, err)
 	}
-	fmt.Println("Error writing in csv file", r.csvw.Write(r.getMovieValues(movie)))
+	r.csvw.Write(r.getMovieValues(movie))
 	r.csvw.Flush()
 	return &movie, nil
 }
@@ -63,11 +70,63 @@ func (r *MovieService) GetAll() ([]model.Movie, error) {
 	return movies, nil
 }
 
+func (r *MovieService) GetFilteredMovies(params map[string][]string) ([]model.Movie, error) {
+	movies := r.readMovies()
+	filtersByName := map[string]filterFn{
+		"genre": genreFilter,
+	}
+
+	filtersToApply := []filterFn{}
+
+	for paramName, _ := range params {
+		if filter := filtersByName[paramName]; filter != nil {
+			filtersToApply = append(filtersToApply, filter)
+		}
+	}
+
+	jobs := 2
+	if jobParam := params["jobs"]; len(jobParam) > 0 {
+		jobString := jobParam[0]
+		jobsNumber, err := strconv.Atoi(jobString)
+		if err == nil {
+			jobs = jobsNumber
+		}
+	}
+
+	// Lets divide the movies array in two by having 2 go routines
+	c := make(chan []model.Movie)
+
+	moviesToProcess := len(movies) / jobs
+	startTime := time.Now()
+	for i := 0; i < jobs; i++ {
+		start := moviesToProcess * i
+		end := moviesToProcess * (i + 1)
+		isLastJob := i == jobs-1
+		if isLastJob && end < len(movies) {
+			end += 1
+		}
+		fmt.Println("i:", i, " moviesToProcess: ", moviesToProcess, " movies len", len(movies), "start: ", start, "end:", end)
+		go func() {
+			c <- filterMovies(movies[start:end], filtersToApply, params)
+		}()
+	}
+	filteredMovies := []model.Movie{}
+	for i := 0; i < jobs; i++ {
+		select {
+		case movies := <-c:
+			if len(movies) > 0 {
+				filteredMovies = append(filteredMovies, movies...)
+			}
+		}
+	}
+	elapsed := time.Since(startTime)
+	fmt.Printf("Filtering moovies took %s", elapsed)
+	return filteredMovies, nil
+}
+
 func (r *MovieService) SearchMovies(query string, page int) ([]byte, error) {
 	pageString := strconv.Itoa(page)
-	fmt.Println(
-		"page:", pageString,
-		"query:", query)
+
 	resp, err := r.client.R().
 		SetQueryParams(map[string]string{
 			"api_key":       r.config.MoviesAPI.ApiKey,
@@ -78,25 +137,15 @@ func (r *MovieService) SearchMovies(query string, page int) ([]byte, error) {
 		}).
 		Get(fmt.Sprint(r.config.MoviesAPI.BaseUrl, "/search/movie"))
 
-	fmt.Println(fmt.Sprint(r.config.MoviesAPI.BaseUrl, "/search/movie"))
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("Response Info:")
-	fmt.Println("  Error      :", err)
-	fmt.Println("  Status Code:", resp.StatusCode())
-	fmt.Println("  Status     :", resp.Status())
-	fmt.Println("  Proto      :", resp.Proto())
-	fmt.Println("  Time       :", resp.Time())
-	fmt.Println("  Received At:", resp.ReceivedAt())
-	fmt.Println("  Body       :\n", resp)
-	fmt.Println()
 
 	return resp.Body(), nil
 }
 
 func (r *MovieService) readMovies() []model.Movie {
-
+	r.file.Seek(0, io.SeekStart)
 	csvLines, err := r.csvr.ReadAll()
 	movies := make([]model.Movie, 0)
 	if err != nil {
@@ -117,12 +166,22 @@ func (r *MovieService) getExternalMovie(id int) (model.Movie, error) {
 			"language": r.config.MoviesAPI.Defaults["lang"],
 		}).
 		Get(fmt.Sprint(r.config.MoviesAPI.BaseUrl, "/movie/", id))
+
+	statusCode := resp.StatusCode()
+	if statusCode == http.StatusNotFound {
+		return model.Movie{}, fmt.Errorf("external api: %w", model.ErrorNotFound)
+	}
+
+	if err != nil || statusCode != http.StatusOK {
+		return model.Movie{}, fmt.Errorf("external api: %w", model.ErrorUnexpected)
+	}
+
 	movie := model.Movie{}
 
 	if err := json.Unmarshal(resp.Body(), &movie); err != nil {
-		fmt.Println("err in unmarshall", err)
+		return model.Movie{}, fmt.Errorf("getExternalMovie: %w", model.ErrorParsing)
 	}
-	fmt.Println("err", err)
+
 	return movie, nil
 }
 
@@ -167,23 +226,28 @@ func (r *MovieService) parseMovieLine(movieLine []string) model.Movie {
 	movie := model.Movie{}
 	movie.ID, _ = strconv.Atoi(movieLine[0])
 	movie.Budget, _ = strconv.Atoi(movieLine[1])
-	for _, genreLine := range strings.Split(movieLine[2], GENRES_SEPARATOR) {
-		genreAttrs := strings.Split(genreLine, GENRES_ATTRS_SEPARATOR)
-		ID, _ := strconv.Atoi(genreAttrs[0])
-		Name := transformContent(genreAttrs[1], false)
-		movie.Genres = append(movie.Genres, model.Genre{ID: ID, Name: Name})
+	if movieLine[2] != "" {
+		for _, genreLine := range strings.Split(movieLine[2], GENRES_SEPARATOR) {
+			genreAttrs := strings.Split(genreLine, GENRES_ATTRS_SEPARATOR)
+			ID, _ := strconv.Atoi(genreAttrs[0])
+			Name := transformContent(genreAttrs[1], false)
+			movie.Genres = append(movie.Genres, model.Genre{ID: ID, Name: Name})
+		}
 	}
+
 	movie.OriginalLanguage = transformContent(movieLine[3], false)
 	movie.OriginalTitle = transformContent(movieLine[4], false)
 	movie.Overview = transformContent(movieLine[5], false)
 	movie.PosterPath = transformContent(movieLine[6], false)
 	movie.ReleaseDate = transformContent(movieLine[7], false)
 	movie.Revenue, _ = strconv.Atoi(movieLine[8])
-	for _, spokenLanguageLine := range strings.Split(movieLine[9], SPOKEN_LANGUAGES_SEPARATOR) {
-		spokenLanguageAttrs := strings.Split(spokenLanguageLine, SPOKEN_LANGUAGES_ATTRS_SEPARATOR)
-		englishName := transformContent(spokenLanguageAttrs[0], false)
-		name := transformContent(spokenLanguageAttrs[1], false)
-		movie.SpokenLanguages = append(movie.SpokenLanguages, model.Language{Name: name, EnglishName: englishName})
+	if movieLine[9] != "" {
+		for _, spokenLanguageLine := range strings.Split(movieLine[9], SPOKEN_LANGUAGES_SEPARATOR) {
+			spokenLanguageAttrs := strings.Split(spokenLanguageLine, SPOKEN_LANGUAGES_ATTRS_SEPARATOR)
+			englishName := transformContent(spokenLanguageAttrs[0], false)
+			name := transformContent(spokenLanguageAttrs[1], false)
+			movie.SpokenLanguages = append(movie.SpokenLanguages, model.Language{Name: name, EnglishName: englishName})
+		}
 	}
 	movie.Status = transformContent(movieLine[10], false)
 	movie.Title = transformContent(movieLine[11], false)
@@ -200,7 +264,33 @@ func transformContent(content string, shouldScapeCharacters bool) string {
 			scapedContent = strings.ReplaceAll(scapedContent, character, scapedCharacter)
 		} else {
 			scapedContent = strings.ReplaceAll(scapedContent, scapedCharacter, character)
+
 		}
 	}
 	return scapedContent
+}
+
+func filterMovies(movies []model.Movie, filters []filterFn, params map[string][]string) []model.Movie {
+	filteredMovies := []model.Movie{}
+	if len(filters) == 0 {
+		return movies
+	}
+	for _, movie := range movies {
+		for _, filter := range filters {
+			if filter(movie, params) {
+				filteredMovies = append(filteredMovies, movie)
+			}
+		}
+	}
+	return filteredMovies
+}
+
+func genreFilter(movie model.Movie, params map[string][]string) bool {
+	genreName := params["genre"][0]
+	for _, movieGenre := range movie.Genres {
+		if movieGenre.Name == genreName {
+			return true
+		}
+	}
+	return false
 }
