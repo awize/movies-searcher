@@ -2,15 +2,13 @@ package model
 
 import "errors"
 
-type err error
-
 type Error struct {
 	Code        string
 	Description string
-	err
+	Err         error
 }
 
-func (e *Error) Unwrap() error { return e.err }
+func (e *Error) Unwrap() error { return e.Err }
 
 var ErrorNotFound = Error{
 	"e404",
