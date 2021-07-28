@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -47,6 +48,7 @@ func main() {
 	defer fileR.Close()
 	defer fileW.Close()
 	client := resty.New()
+	client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	csvr := csv.NewReader(fileR)
 	csvw := csv.NewWriter(fileW)
 	movieService := service.NewMoviesService(fileR, csvr, csvw, client, config)
@@ -59,7 +61,7 @@ func main() {
 	r.GET("/healthcheck", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Working"})
 	})
-	r.Run("localhost:" + strconv.Itoa(config.Port))
+	r.Run(":" + strconv.Itoa(config.Port))
 }
 
 // Viper -- set config file - file nameyaml
