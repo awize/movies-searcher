@@ -1,4 +1,4 @@
-api_port: 8080
+api_port: 3000
 movies_api:
   base_url: https://api.themoviedb.org/3
   api_key: bd4043ab2ee8a2d9479e21aebe6c2406
