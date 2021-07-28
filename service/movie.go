@@ -112,21 +112,26 @@ func (r *MovieService) GetFilteredMovies(params map[string][]string) ([]model.Mo
 	}
 	filteredMovies := []model.Movie{}
 	for i := 0; i < jobs; i++ {
-		select {
-		case movies := <-c:
-			if len(movies) > 0 {
-				filteredMovies = append(filteredMovies, movies...)
-			}
+		moviesComing := <-c
+		if len(moviesComing) > 0 {
+			filteredMovies = append(filteredMovies, moviesComing...)
 		}
+		// select {
+		// case movies := <-c:
+		// 	if len(movies) > 0 {
+		// 		filteredMovies = append(filteredMovies, movies...)
+		// 	}
+		// case <- time.After(800 * time.Millisecond)
+		// 	return
+		// }
 	}
 	elapsed := time.Since(startTime)
-	fmt.Printf("Filtering moovies took %s", elapsed)
+	fmt.Printf("Filtering movies took %s", elapsed)
 	return filteredMovies, nil
 }
 
 func (r *MovieService) SearchMovies(query string, page int) ([]byte, error) {
 	pageString := strconv.Itoa(page)
-
 	resp, err := r.client.R().
 		SetQueryParams(map[string]string{
 			"api_key":       r.config.MoviesAPI.ApiKey,
@@ -138,6 +143,13 @@ func (r *MovieService) SearchMovies(query string, page int) ([]byte, error) {
 		Get(fmt.Sprint(r.config.MoviesAPI.BaseUrl, "/search/movie"))
 
 	if err != nil {
+		fmt.Println("Response Info:")
+		fmt.Println("  Error      :", err)
+		fmt.Println("  Status Code:", resp.StatusCode())
+		fmt.Println("  Status     :", resp.Status())
+		fmt.Println("  Proto      :", resp.Proto())
+		fmt.Println("  Time       :", resp.Time())
+		fmt.Println("  Received At:", resp.ReceivedAt())
 		return nil, err
 	}
 
@@ -271,6 +283,7 @@ func transformContent(content string, shouldScapeCharacters bool) string {
 }
 
 func filterMovies(movies []model.Movie, filters []filterFn, params map[string][]string) []model.Movie {
+
 	filteredMovies := []model.Movie{}
 	if len(filters) == 0 {
 		return movies
