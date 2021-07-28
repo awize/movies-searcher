@@ -58,7 +58,7 @@ func (r *MovieService) Get(id int) (*model.Movie, error) {
 
 	movie, err := r.getExternalMovie(id)
 	if err != nil {
-		return &model.Movie{}, fmt.Errorf("get %v: %w", id, err)
+		return &model.Movie{}, fmt.Errorf("get %v: %v", id, err)
 	}
 	r.csvw.Write(r.getMovieValues(movie))
 	r.csvw.Flush()
@@ -181,17 +181,17 @@ func (r *MovieService) getExternalMovie(id int) (model.Movie, error) {
 
 	statusCode := resp.StatusCode()
 	if statusCode == http.StatusNotFound {
-		return model.Movie{}, fmt.Errorf("external api: %w", model.ErrorNotFound)
+		return model.Movie{}, fmt.Errorf("external api: %v", model.ErrorNotFound)
 	}
 
 	if err != nil || statusCode != http.StatusOK {
-		return model.Movie{}, fmt.Errorf("external api: %w", model.ErrorUnexpected)
+		return model.Movie{}, fmt.Errorf("external api: %v", model.ErrorUnexpected)
 	}
 
 	movie := model.Movie{}
 
 	if err := json.Unmarshal(resp.Body(), &movie); err != nil {
-		return model.Movie{}, fmt.Errorf("getExternalMovie: %w", model.ErrorParsing)
+		return model.Movie{}, fmt.Errorf("getExternalMovie: %v", model.ErrorParsing)
 	}
 
 	return movie, nil
