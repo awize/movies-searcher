@@ -34,6 +34,21 @@ func (m *MockMovieUseCase) EXPECT() *MockMovieUseCaseMockRecorder {
 	return m.recorder
 }
 
+// FilterMovies mocks base method.
+func (m *MockMovieUseCase) FilterMovies(params map[string][]string) ([]model.Movie, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FilterMovies", params)
+	ret0, _ := ret[0].([]model.Movie)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FilterMovies indicates an expected call of FilterMovies.
+func (mr *MockMovieUseCaseMockRecorder) FilterMovies(params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FilterMovies", reflect.TypeOf((*MockMovieUseCase)(nil).FilterMovies), params)
+}
+
 // GetMovie mocks base method.
 func (m *MockMovieUseCase) GetMovie(id int) (*model.Movie, error) {
 	m.ctrl.T.Helper()
