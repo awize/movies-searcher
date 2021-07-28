@@ -31,7 +31,7 @@ func (u *MovieUsecase) GetMovie(id int) (*model.Movie, error) {
 	}
 
 	if movie == nil {
-		return nil, fmt.Errorf("get movie %v: %w", id, model.ErrorNotFound)
+		return nil, fmt.Errorf("get movie %v: %v", id, model.ErrorNotFound)
 	}
 
 	return movie, nil
