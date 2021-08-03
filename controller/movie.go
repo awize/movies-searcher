@@ -71,7 +71,6 @@ func (mc *MovieController) SearchMovie() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "something unexpected happened"})
 			return
 		}
-		fmt.Println(result)
 
 		c.Data(http.StatusOK, "application/json", result)
 	}

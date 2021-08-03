@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -60,6 +61,7 @@ func (r *MovieService) Get(id int) (*model.Movie, error) {
 	if err != nil {
 		return &model.Movie{}, fmt.Errorf("get %v: %v", id, err)
 	}
+
 	r.csvw.Write(r.getMovieValues(movie))
 	r.csvw.Flush()
 	return &movie, nil
@@ -74,6 +76,7 @@ func (r *MovieService) GetFilteredMovies(params map[string][]string) ([]model.Mo
 	movies := r.readMovies()
 	filtersByName := map[string]filterFn{
 		"genre": genreFilter,
+		"lang":  langFilter,
 	}
 
 	filtersToApply := []filterFn{}
@@ -289,19 +292,59 @@ func filterMovies(movies []model.Movie, filters []filterFn, params map[string][]
 		return movies
 	}
 	for _, movie := range movies {
+		fitsFilters := true
 		for _, filter := range filters {
-			if filter(movie, params) {
-				filteredMovies = append(filteredMovies, movie)
+			if !filter(movie, params) {
+				fitsFilters = false
+				break
 			}
+		}
+		if fitsFilters {
+			filteredMovies = append(filteredMovies, movie)
 		}
 	}
 	return filteredMovies
 }
 
 func genreFilter(movie model.Movie, params map[string][]string) bool {
-	genreName := params["genre"][0]
+	genreParameter, err := url.PathUnescape(params["genre"][0])
+	fmt.Println(genreParameter)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+
+	genreNames := strings.Split(genreParameter, ",")
+
+	shouldFilter := len(genreNames) > 0
+	if !shouldFilter {
+		return true
+	}
+
+	if len(movie.Genres) == 0 && shouldFilter {
+		fmt.Println("Empty genres and should filter")
+		return false
+	}
+
+	var genreMap = make(map[string]bool)
+
+	for _, genreName := range genreNames {
+		genreMap[genreName] = true
+	}
+
+	genresMatched := 0
 	for _, movieGenre := range movie.Genres {
-		if movieGenre.Name == genreName {
+		if genreMap[movieGenre.Name] {
+			genresMatched += 1
+		}
+	}
+	return len(genreNames) == genresMatched
+}
+
+func langFilter(movie model.Movie, params map[string][]string) bool {
+	lang := params["lang"][0]
+	for _, spokenLanguage := range movie.SpokenLanguages {
+		if spokenLanguage.EnglishName == lang {
 			return true
 		}
 	}
